@@ -5,7 +5,7 @@ The Identity Theft Research Center Data Compromises 2005 - 2023
 
 U.S. Department of Health and Human Services Office for Civil Rights Data Breach Incidents 2009 - 2025
 
-Aggregated Top Data Breaches from Around the World [6]
+Aggregated Top Data Breaches from Around the World
 
 
 ## Models
