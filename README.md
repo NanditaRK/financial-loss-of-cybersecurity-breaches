@@ -22,4 +22,4 @@ Analizations of factors that cause Data Compromises
 Created By: Nandita Raj Kumar and Shreya Chittipeddi
 For Modeling the Future Challenge 2025
 
-[Report]([url](https://docs.google.com/document/d/1F9qtb_3Ph9gvQntT3lUEf5PfCRI1ev1EDKWpHZoE7rw/edit?usp=sharing))
+[Report]((https://docs.google.com/document/d/1F9qtb_3Ph9gvQntT3lUEf5PfCRI1ev1EDKWpHZoE7rw/edit?usp=sharing))
