@@ -2,7 +2,7 @@
 
 ## Data
 
-1.The Identity Theft Research Center Data Compromises 2005 - 2023
+1. The Identity Theft Research Center Data Compromises 2005 - 2023
 
 2. U.S. Department of Health and Human Services Office for Civil Rights Data Breach Incidents 2009 - 2025
 
