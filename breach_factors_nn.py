@@ -1,21 +1,33 @@
 import pandas as pd
 import torch
+import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # read data
-df = pd.read_csv('breach_report.csv')
+df = pd.read_csv('data/breach_report.csv')
 
 # data preprocessing
 if df.isna().sum().any():
-    df = df.dropna() 
+    df = df.dropna()
+cost_of_individual_record = 169
+
+df['Financial Loss'] = df['Individuals Affected'] * cost_of_individual_record
+
+df = df.drop(columns=['Individuals Affected'])
+# log transform to reduce variance
+df['log_Financial_Loss'] = np.log1p(df['Financial Loss'])
+
 
 categorical_columns = ['State', 'Covered Entity Type', 'Type of Breach', 
                        'Location of Breached Information', 'Business Associate Present']
-target_column = 'Individuals Affected'
+target_column = 'log_Financial_Loss'
+
 
 encoder = LabelEncoder()
 for col in categorical_columns:
@@ -24,10 +36,19 @@ for col in categorical_columns:
 X = df[categorical_columns].values
 y = df[target_column].values
 
+
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# load data
+# visualize distribution of target
+plt.figure(figsize=(10, 6))
+plt.hist(df['log_Financial_Loss'], bins=50, color='skyblue', edgecolor='black')
+plt.title('Distribution of Log-transformed Financial Loss', fontsize=16)
+plt.xlabel('Log(Financial Loss + 1)', fontsize=14)
+plt.ylabel('Frequency', fontsize=14)
+plt.grid(axis='y')
+plt.show()
+
 X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
@@ -41,68 +62,63 @@ test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-# feed forward neural network model definition
 class BreachImpactModel(nn.Module):
     def __init__(self):
         super(BreachImpactModel, self).__init__()
-        self.fc1 = nn.Linear(X_train.shape[1], 64)  
-        self.fc2 = nn.Linear(64, 32)  
-        self.fc3 = nn.Linear(32, 16)  
-        self.fc4 = nn.Linear(16, 1) 
+        self.fc1 = nn.Linear(X_train.shape[1], 64)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(32, 1)
+        self.dropout = nn.Dropout(p=0.2)
 
     def forward(self, x):
-        x = torch.relu(self.fc1(x))  
-        x = torch.relu(self.fc2(x))  
-        x = torch.relu(self.fc3(x))  
-        x = self.fc4(x)  
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)  
+        x = torch.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)
         return x
 
 model = BreachImpactModel()
 
-optimizer = optim.Adam(model.parameters(), lr=0.0001)
-loss_fn = nn.MSELoss()
-
-# weight initialization (xavier uniform)
 def init_weights(m):
     if isinstance(m, nn.Linear):
-        nn.init.xavier_uniform_(m.weight)
+        nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
         if m.bias is not None:
             nn.init.zeros_(m.bias)
 
 model.apply(init_weights)
 
-#training
-num_epochs = 50
+
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+# considered the huber loss
+loss_fn = nn.SmoothL1Loss()  
+
+num_epochs = 500
 for epoch in range(num_epochs):
     model.train()
     epoch_loss = 0.0
-    
     for inputs, labels in train_loader:
-        # gradient to zero
         optimizer.zero_grad()
-        
-        # forward propagation
         outputs = model(inputs)
-        
-        # loss calculation
         loss = loss_fn(outputs, labels)
-        
-        # backward propagation
         loss.backward()
-        
-       
-        # gradient clipping to prevent exploding gradients
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        
-        # update the weights
         optimizer.step()
-        
-        # add the loss for this batch
         epoch_loss += loss.item()
-    
+
+
+    model.eval()
+    train_loss = epoch_loss / len(train_loader)
+    test_loss = 0.0
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            outputs = model(inputs)
+            loss = loss_fn(outputs, labels)
+            test_loss += loss.item()
+    test_loss /= len(test_loader)
 
     if (epoch + 1) % 10 == 0:
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss/len(train_loader):.4f}')
+        print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
+
 
 def evaluate_model(model, data_loader, loss_fn):
     model.eval()
@@ -114,53 +130,49 @@ def evaluate_model(model, data_loader, loss_fn):
             total_loss += loss.item()
     return total_loss / len(data_loader)
 
+# evaluation
+train_loss = evaluate_model(model, train_loader, loss_fn)
+test_loss = evaluate_model(model, test_loader, loss_fn)
+
+print(f'Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
+
+predicted_log_values = model(X_test_tensor).squeeze().detach().numpy()
+
+# revert from log transformation
+predicted_values = np.exp(predicted_log_values)
+
+# graph
+plt.figure(figsize=(10, 6))
+plt.scatter(y_test, predicted_values, color='blue', alpha=0.6)
+plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
+plt.title('Predicted vs Financial Loss', fontsize=16)
+plt.xlabel('Actual Financial Loss', fontsize=14)
+plt.ylabel('Predicted Financial Loss', fontsize=14)
+plt.show()
 
 
-import numpy as np
-
+# permutation analysis
 def permutation_importance(model, X, y, data_loader, loss_fn):
-    # evaluation of the model on the original data
     baseline_loss = evaluate_model(model, data_loader, loss_fn)
-    
     feature_importance = []
     
-    # loops through each feature
     for i in range(X.shape[1]):
-        # permutes the feature column
         X_permuted = X.copy()
         X_permuted[:, i] = np.random.permutation(X_permuted[:, i])
         
-        # dataloader for the permuted data
         permuted_tensor = torch.tensor(X_permuted, dtype=torch.float32)
         permuted_dataset = TensorDataset(permuted_tensor, torch.tensor(y, dtype=torch.float32).view(-1, 1))
         permuted_loader = DataLoader(permuted_dataset, batch_size=32, shuffle=False)
         
-        # evaluate model with permuted feature
         permuted_loss = evaluate_model(model, permuted_loader, loss_fn)
-        
-        # calculate the change in performance (increase in loss)
         importance = permuted_loss - baseline_loss
         feature_importance.append(importance)
         print(f'Feature {i}: Importance = {importance:.4f}')
     
     return feature_importance
 
-
-
-# evalulates permutation importance
+# Evaluate permutation importance
 feature_importance = permutation_importance(model, X_train, y_train, train_loader, loss_fn)
-
 print("Feature Importance:")
 for idx, imp in enumerate(feature_importance):
     print(f"Feature {categorical_columns[idx]}: Importance = {imp:.4f}")
-
-
-# shap values
-import shap
-
-# create a SHAP explainer
-explainer = shap.Explainer(model, X_train)
-shap_values = explainer(X_train)
-
-# plot the SHAP values
-shap.summary_plot(shap_values, X_train, feature_names=categorical_columns)
