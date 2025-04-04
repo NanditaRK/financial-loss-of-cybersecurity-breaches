@@ -8,13 +8,20 @@ Developed as part of the **Modeling the Future Challenge 2025**.
 
 ## Data Sources
 To ensure robust and comprehensive analysis, we used the following datasets:  
-1. **Identity Theft Research Center Data Compromises (2005–2023)**  
-   A longitudinal dataset tracking identity theft and data breach incidents.  
 
-2. **U.S. Department of Health and Human Services Office for Civil Rights Data Breach Incidents (2009–2025)**  
+1. **Identity Theft Research Center Data Compromises (2005–2023)**  
+   A longitudinal dataset tracking identity theft and data breach incidents.
+   
+2. **Ponemon Institute and IBM Cost of a Data Breach Reports (2008-2024)**
+  A dataset that contains the cost of data breach per year based on the research conducted by IBM and Ponemon Institute.
+
+3. **The Identity Theft Research Center Data Breaches and Incident Reports (2016-2023)**
+  A dataset that contains information about over 2,000 individual data breaches, including the number of individuals impacted and method of breach.
+
+4. **U.S. Department of Health and Human Services Office for Civil Rights Data Breach Incidents (2009–2025)**  
    Focuses on data breaches impacting healthcare organizations and protected health information.  
 
-3. **Aggregated Top Data Breaches from Around the World**  
+5. **Aggregated Top Data Breaches from Around the World**  
    A global dataset highlighting large-scale breaches across various industries.  
 
 
