@@ -11,6 +11,7 @@ import numpy as np
 
 raw_data = pd.read_csv('data/vcdb.csv', low_memory=False)
 
+# these wwere the categories we deemed most important throught 
 keywords = [
     'security_incident',
     'impact.overall_rating',
