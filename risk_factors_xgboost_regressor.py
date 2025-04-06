@@ -9,14 +9,16 @@ from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import LabelEncoder
-
+# get data from top breaches dataset
 raw_data = pd.read_csv('data/top_breaches.csv')
 
+# define the features
 raw_data = raw_data.iloc[1:]
 raw_data = raw_data[['sector', 'method', 'data sensitivity', 'date', 'records lost']]
 
 raw_data['records lost'] = raw_data['records lost'].str.replace(',', '').str.replace(';', '').astype(int)
 
+# encode data to be numerical
 label_encoder = LabelEncoder()
 for column in ['sector', 'method', 'data sensitivity', 'date']:
     raw_data[column] = label_encoder.fit_transform(raw_data[column])
@@ -24,10 +26,13 @@ for column in ['sector', 'method', 'data sensitivity', 'date']:
 X = raw_data[['sector', 'method', 'data sensitivity', 'date']]
 y = raw_data['records lost']
 
+# approx 70/30 training split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=7)
 
 xgb_regressor = XGBRegressor(objective='reg:squarederror', random_state=42)
+# fit out model
 xgb_regressor.fit(X_train, y_train)
+# this is to visualize our tree 
 viz_model = model(
     xgb_regressor.get_booster(),
     X_train=X_train,
@@ -45,6 +50,7 @@ plt.show()
 viz_model.view()
 y_pred = xgb_regressor.predict(X_test)
 
+# printout the metrcs
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 print(f"Mean Squared Error: {mse}")
