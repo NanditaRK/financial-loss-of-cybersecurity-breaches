@@ -11,7 +11,7 @@ import numpy as np
 
 raw_data = pd.read_csv('data/vcdb.csv', low_memory=False)
 
-# these wwere the categories we deemed most important throught 
+# these wwere the categories we deemed most important through PLS-DA (partial least squares discriminant analysis) as well as selecting some categoies based on topic knowledge.
 keywords = [
     'security_incident',
     'impact.overall_rating',
@@ -31,6 +31,7 @@ keywords = [
     'attribute.confidentiality.data.variety',
 ]
 
+# filter data based on these keywords
 filtered_columns = [col for col in raw_data.columns if any(keyword in col for keyword in keywords)]
 filtered_data = raw_data[filtered_columns]
 
@@ -49,10 +50,11 @@ X = final_data.drop(columns=impact_columns.columns.tolist() + ['impact_category'
 y = final_data['impact_category']
 
 X = X.astype(int)
-
+# encode the data so it is numerical
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
+# 70/30 training split
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.3, random_state=87, stratify=y_encoded)
 
 print("Class distribution before SMOTE:", np.bincount(y_train))
@@ -61,11 +63,13 @@ min_samples_class = min(np.bincount(y_train))
 
 n_neighbors = min(min_samples_class - 1, 5) 
 
+# SMOTE
 smote = SMOTE(sampling_strategy='auto', k_neighbors=n_neighbors, random_state=42)
 X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
 
 print("Class distribution after SMOTE:", np.bincount(y_train_resampled))
 
+# define the xgboost classifier model
 xgb_model = XGBClassifier(
     objective='multi:softmax',
     num_class=len(label_encoder.classes_),
@@ -73,6 +77,7 @@ xgb_model = XGBClassifier(
     random_state=42
 )
 
+# grid search parameters
 param_grid = {
     'learning_rate': [0.01, 0.05, 0.1],
     'max_depth': [3, 6, 10],
@@ -81,7 +86,7 @@ param_grid = {
     'colsample_bytree': [0.7, 0.8, 1.0]
 }
 
-
+# grid search
 grid_search = GridSearchCV(xgb_model, param_grid, scoring='accuracy', cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42), n_jobs=-1)
 grid_search.fit(X_train_resampled, y_train_resampled)
 
@@ -89,6 +94,7 @@ print("Best parameters from grid search:", grid_search.best_params_)
 
 best_model = grid_search.best_estimator_
 
+# fit model based on ht ebe best paramenteres
 best_model.fit(X_train_resampled, y_train_resampled)
 
 train_accuracy = best_model.score(X_train_resampled, y_train_resampled)
@@ -98,12 +104,14 @@ y_pred = best_model.predict(X_test)
 y_pred_labels = label_encoder.inverse_transform(y_pred)
 y_test_labels = label_encoder.inverse_transform(y_test)
 
+# print out results
 print("Cross Validations Scores: ", cross_val_score(best_model, X_test, y_test, cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42)) )
 print("Training Accuracy:", train_accuracy)
 print("Testing Accuracy:", test_accuracy)
 print("\nConfusion Matrix:\n", confusion_matrix(y_test_labels, y_pred_labels, labels=label_encoder.classes_))
 print("\nClassification Report:\n", classification_report(y_test_labels, y_pred_labels, target_names=label_encoder.classes_))
 
+# print feature importance of model
 feature_importance = pd.DataFrame({
     'Feature': X_train.columns,
     'Importance': best_model.feature_importances_
@@ -119,7 +127,7 @@ plt.show()
 
 import shap
 
-# Visualize SHAP values
+# visualize the SHAP values
 explainer = shap.TreeExplainer(best_model)
 shap_values = explainer.shap_values(X_test)
 shap.summary_plot(shap_values, X_test, plot_type="bar", show=True)
