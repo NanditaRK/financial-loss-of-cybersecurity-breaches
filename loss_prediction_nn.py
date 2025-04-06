@@ -9,26 +9,28 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# read data
+# read data that is combined from both datasets three and four as well as dataset two for financial cost data because we want to have a dataset that is both generalized and focused (on healthcare sector)
 df = pd.read_csv('data/breach_report.csv')
 
 # data preprocessing
 if df.isna().sum().any():
     df = df.dropna()
+    
 cost_of_individual_record = 169
 
 df['Financial Loss'] = df['Individuals Affected'] * cost_of_individual_record
 
 df = df.drop(columns=['Individuals Affected'])
+
 # log transform to reduce variance
 df['log_Financial_Loss'] = np.log1p(df['Financial Loss'])
 
-
+# label the categories and set the target variables
 categorical_columns = ['State', 'Covered Entity Type', 'Type of Breach', 
                        'Location of Breached Information', 'Business Associate Present']
 target_column = 'log_Financial_Loss'
 
-
+# encode the categorical columns into a numerical value because our neural network only likes eating numbers !!!
 encoder = LabelEncoder()
 for col in categorical_columns:
     df[col] = encoder.fit_transform(df[col])
@@ -49,8 +51,10 @@ plt.ylabel('Frequency', fontsize=14)
 plt.grid(axis='y')
 plt.show()
 
+# split our data into 80/20 split
 X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
+# turn into tensors for neural network because we are using pytorch
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
 X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train, dtype=torch.float32).view(-1, 1)
@@ -62,6 +66,7 @@ test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
+# deine architecture of oruy model 
 class BreachImpactModel(nn.Module):
     def __init__(self):
         super(BreachImpactModel, self).__init__()
@@ -80,6 +85,8 @@ class BreachImpactModel(nn.Module):
 
 model = BreachImpactModel()
 
+# using kaiming weight initialization whcih is basicaly just a fancy shmancy type of way to initialize the wieghts to avoid exploding gradients or vanishing gradients
+# this is a good weight initialization that pairs up with the relu activation function
 def init_weights(m):
     if isinstance(m, nn.Linear):
         nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
@@ -88,11 +95,13 @@ def init_weights(m):
 
 model.apply(init_weights)
 
-
+# adam optimizer a built in optimizer (gradient descent) from pytorch
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-# considered the huber loss
+
+# considered the huber loss, a type of loss functioon
 loss_fn = nn.SmoothL1Loss()  
 
+# the training loopp!!
 num_epochs = 500
 for epoch in range(num_epochs):
     model.train()
@@ -130,7 +139,7 @@ def evaluate_model(model, data_loader, loss_fn):
             total_loss += loss.item()
     return total_loss / len(data_loader)
 
-# evaluation
+# evaluation of model 
 train_loss = evaluate_model(model, train_loader, loss_fn)
 test_loss = evaluate_model(model, test_loader, loss_fn)
 
@@ -151,7 +160,7 @@ plt.ylabel('Predicted Financial Loss', fontsize=14)
 plt.show()
 
 
-# permutation analysis
+# permutation analysis gives us the feature importance here
 def permutation_importance(model, X, y, data_loader, loss_fn):
     baseline_loss = evaluate_model(model, data_loader, loss_fn)
     feature_importance = []
